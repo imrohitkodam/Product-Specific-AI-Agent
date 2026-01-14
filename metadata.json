@@ -1,0 +1,7 @@
+{
+  "name": "DocuMind RAG Assistant",
+  "description": "A high-performance Retrieval-Augmented Generation (RAG) application that allows users to upload documents (PDF, TXT, MD) and query them using Gemini 3 Flash. Features include document parsing, context-aware Q&A, and precise citations.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

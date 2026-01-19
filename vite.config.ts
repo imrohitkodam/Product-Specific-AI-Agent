@@ -22,7 +22,8 @@ export default defineConfig(({ mode }) => {
       }
     },
     build: {
-      chunkSizeWarningLimit: 2000,
+      // increase warning limit to 2 MB to silence Vite warning
+      chunkSizeWarningLimit: 2000
     }
   };
 });

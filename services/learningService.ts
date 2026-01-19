@@ -3,6 +3,7 @@ import { geminiService } from './geminiService';
 import { loadKnowledge, saveKnowledge } from '../utils/storage';
 import { cosineSimilarity } from '../utils/vectorStore';
 import { RAGResponse, KnowledgeItem } from '../types';
+import { supabaseService } from './supabaseService';
 
 export class LearningService {
 
@@ -64,6 +65,7 @@ export class LearningService {
 
             // 3. Save to DB
             await saveKnowledge(newItem);
+            await supabaseService.upsertKnowledge(newItem);
             console.log("🧠 Learned new solution!");
 
         } catch (error) {

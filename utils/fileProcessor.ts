@@ -58,12 +58,17 @@ async function processImage(file: File | Blob, path: string): Promise<Partial<Do
 async function processText(file: File | Blob, path: string): Promise<Partial<Document>> {
   const content = await file.text();
   const isJoomlaManifest = path.endsWith('.xml') && (content.includes('<extension') || content.includes('<install'));
-  
+
   let moduleName = 'General';
   if (isJoomlaManifest) {
     const nameMatch = content.match(/<name>(.*?)<\/name>/);
     if (nameMatch) moduleName = nameMatch[1];
   }
+
+  // Determine category based on extension
+  const ext = path.split('.').pop()?.toLowerCase() || '';
+  const codeExtensions = ['php', 'js', 'ts', 'jsx', 'tsx', 'css', 'scss', 'json', 'xml', 'ini', 'html', 'vue', 'py'];
+  const category: 'code' | 'docs' = codeExtensions.includes(ext) ? 'code' : 'docs';
 
   return {
     content,
@@ -71,6 +76,7 @@ async function processText(file: File | Blob, path: string): Promise<Partial<Doc
     type: file.type || 'text/plain',
     isJoomlaManifest,
     moduleName,
+    category,
     status: 'ready'
   };
 }

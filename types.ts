@@ -10,6 +10,7 @@ export interface Document {
   path?: string; // Preserve folder structure
   isJoomlaManifest?: boolean;
   moduleName?: string;
+  category?: 'code' | 'docs'; // NEW: for sidebar grouping
   status: 'processing' | 'ready' | 'error';
   indexingStatus?: 'pending' | 'indexing' | 'completed' | 'failed';
   isSelected: boolean;

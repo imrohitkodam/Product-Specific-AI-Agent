@@ -8,9 +8,10 @@ import { geminiService } from './services/geminiService';
 import { crewService } from './services/crewService';
 import { learningService } from './services/learningService';
 import { shadowIndexer } from './services/shadowIndexer';
-import { initDB, loadDocuments, saveDocuments, saveEmbeddings, loadEmbeddings, clearAllData } from './utils/storage';
+import { initDB, loadDocuments, saveDocuments, saveEmbeddings, loadEmbeddings, clearAllData, saveKnowledge } from './utils/storage';
 import { splitTextIntoChunks } from './utils/textSplitter';
 import { findMostRelevantChunks, EmbeddedChunk } from './utils/vectorStore';
+import { supabaseService } from './services/supabaseService';
 
 const App: React.FC = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -28,13 +29,57 @@ const App: React.FC = () => {
     const init = async () => {
       try {
         await initDB();
+
+        // 1. Load from Local Storage (IndexedDB)
         const storedDocs = await loadDocuments();
         if (storedDocs.length > 0) {
-          setDocuments(prev => {
-            const existingIds = new Set(prev.map(d => d.id));
-            const newDocs = storedDocs.filter(d => !existingIds.has(d.id));
-            return [...prev, ...newDocs];
-          });
+          setDocuments(storedDocs);
+        }
+
+        // 2. Load from Shared Storage (Supabase) if local is empty or for public users
+        if (storedDocs.length === 0 || !isAdmin) {
+          console.log("Fetching shared data from Supabase...");
+          const { documents: sharedDocs, embeddings: sharedEmbeddings, knowledge: sharedKnowledge } = await supabaseService.fetchAllSharedData();
+
+          if (sharedDocs.length > 0) {
+            // Map Supabase fields to local Document interface
+            const mappedDocs: Document[] = sharedDocs.map((d: any) => ({
+              id: d.id,
+              name: d.name,
+              type: d.type || 'text/plain',
+              size: d.size || 0,
+              content: d.content,
+              path: d.path,
+              moduleName: d.module_name,
+              isJoomlaManifest: d.is_joomla_manifest,
+              status: 'ready',
+              indexingStatus: 'completed',
+              isSelected: true
+            }));
+
+            setDocuments(mappedDocs);
+            await saveDocuments(mappedDocs);
+
+            // Save shared embeddings to local storage
+            if (sharedEmbeddings.length > 0) {
+              const mappedEmbeddings: EmbeddedChunk[] = sharedEmbeddings.map((e: any) => ({
+                id: e.id,
+                documentId: e.document_id,
+                content: e.content,
+                embedding: e.embedding,
+                startIndex: e.start_index || 0,
+                endIndex: e.end_index || 0
+              }));
+              await saveEmbeddings(mappedEmbeddings);
+            }
+
+            // Save shared knowledge to local storage
+            if (sharedKnowledge.length > 0) {
+              for (const k of sharedKnowledge) {
+                await saveKnowledge(k);
+              }
+            }
+          }
         }
       } catch (error) {
         console.error('Failed to load documents:', error);
@@ -85,8 +130,23 @@ const App: React.FC = () => {
     checkKey();
 
     // Setup Shadow Indexer Callback
-    shadowIndexer.setStatusCallback((docId, status) => {
+    shadowIndexer.setStatusCallback(async (docId, status) => {
       setDocuments(prev => prev.map(d => d.id === docId ? { ...d, indexingStatus: status } : d));
+
+      // If indexing completed and we are admin, sync to Supabase
+      if (status === 'completed' && isAdmin) {
+        const allDocs = await loadDocuments();
+        const doc = allDocs.find(d => d.id === docId);
+        if (doc) {
+          await supabaseService.upsertDocuments([doc]);
+          // Also sync embeddings for this doc
+          const allEmbeddings = await loadEmbeddings();
+          const docEmbeddings = allEmbeddings.filter(e => e.documentId === docId);
+          if (docEmbeddings.length > 0) {
+            await supabaseService.upsertEmbeddings(docEmbeddings);
+          }
+        }
+      }
     });
 
     return () => window.removeEventListener('keydown', handleKeyDown);

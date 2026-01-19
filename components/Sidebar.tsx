@@ -29,18 +29,29 @@ const Sidebar: React.FC<SidebarProps> = ({
     window.location.reload();
   };
 
-  // Group documents by moduleName
+  // Group documents by category (Code / Docs), then by moduleName
   const groupedDocuments = useMemo(() => {
-    const groups: Record<string, Document[]> = {};
+    const codeGroups: Record<string, Document[]> = {};
+    const docsGroups: Record<string, Document[]> = {};
+
     documents.forEach(doc => {
       const key = doc.moduleName || 'Ungrouped';
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(doc);
+      const category = doc.category || 'docs';
+
+      if (category === 'code') {
+        if (!codeGroups[key]) codeGroups[key] = [];
+        codeGroups[key].push(doc);
+      } else {
+        if (!docsGroups[key]) docsGroups[key] = [];
+        docsGroups[key].push(doc);
+      }
     });
-    return groups;
+
+    return { code: codeGroups, docs: docsGroups };
   }, [documents]);
 
-  const moduleNames = Object.keys(groupedDocuments);
+  const codeModules = Object.keys(groupedDocuments.code);
+  const docsModules = Object.keys(groupedDocuments.docs);
 
   const toggleModule = (moduleName: string) => {
     setExpandedModules(prev => {
@@ -54,8 +65,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     });
   };
 
-  const toggleAllInModule = (moduleName: string, selected: boolean) => {
-    groupedDocuments[moduleName].forEach(doc => {
+  const toggleAllInModule = (moduleName: string, selected: boolean, category?: 'code' | 'docs') => {
+    const targetDocs = category
+      ? (category === 'code' ? groupedDocuments.code[moduleName] : groupedDocuments.docs[moduleName])
+      : [...(groupedDocuments.code[moduleName] || []), ...(groupedDocuments.docs[moduleName] || [])];
+
+    targetDocs?.forEach(doc => {
       if (doc.isSelected !== selected) {
         onToggleDocSelection(doc.id);
       }
@@ -100,7 +115,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Modules</h3>
+            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Sources</h3>
             <div className="flex items-center gap-2">
               {documents.length > 0 && (
                 <button
@@ -111,7 +126,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </button>
               )}
               <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded text-gray-400 tabular-nums">
-                {moduleNames.length} modules • {documents.length} files
+                {codeModules.length + docsModules.length} modules • {documents.length} files
               </span>
             </div>
           </div>
@@ -122,64 +137,130 @@ const Sidebar: React.FC<SidebarProps> = ({
               <p className="text-[10px] text-gray-700">No knowledge indexed</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {moduleNames.map((moduleName) => {
-                const moduleDocs = groupedDocuments[moduleName];
-                const isExpanded = expandedModules.has(moduleName);
-                const allSelected = moduleDocs.every(d => d.isSelected);
-                const someSelected = moduleDocs.some(d => d.isSelected);
-
-                return (
-                  <div key={moduleName} className="border border-gray-800 rounded-lg overflow-hidden">
-                    {/* Module Header */}
-                    <div
-                      className="flex items-center justify-between p-2 bg-black/20 cursor-pointer hover:bg-black/30 transition-colors"
-                      onClick={() => toggleModule(moduleName)}
-                    >
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={allSelected}
-                          ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
-                          onChange={(e) => { e.stopPropagation(); toggleAllInModule(moduleName, !allSelected); }}
-                          className="w-3.5 h-3.5 rounded border-gray-700 bg-transparent text-purple-600 focus:ring-purple-600 cursor-pointer"
-                        />
-                        <svg className="w-4 h-4 text-purple-400" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>
-                        <span className="text-[11px] text-gray-300 font-medium truncate">{moduleName}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[9px] text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded">{moduleDocs.length} files</span>
-                        <svg className={`w-3 h-3 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-                      </div>
-                    </div>
-
-                    {/* Expanded File List (Limited to 20 max) */}
-                    {isExpanded && (
-                      <div className="max-h-48 overflow-y-auto bg-black/10">
-                        {moduleDocs.slice(0, 20).map((doc) => (
-                          <div key={doc.id} className="flex items-center justify-between px-3 py-1.5 hover:bg-white/5 transition-colors text-[10px]">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <input
-                                type="checkbox" checked={doc.isSelected} onChange={() => onToggleDocSelection(doc.id)}
-                                className="w-3 h-3 rounded border-gray-700 bg-transparent text-purple-600 focus:ring-purple-600 cursor-pointer"
-                              />
-                              <span className="text-gray-400 truncate">{doc.name}</span>
-                            </div>
-                            <button onClick={() => onRemoveDoc(doc.id)} className="text-gray-600 hover:text-red-400 p-0.5">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
-                          </div>
-                        ))}
-                        {moduleDocs.length > 20 && (
-                          <div className="px-3 py-2 text-[9px] text-gray-600 text-center border-t border-gray-800">
-                            ... and {moduleDocs.length - 20} more files
-                          </div>
-                        )}
-                      </div>
-                    )}
+            <div className="space-y-4">
+              {/* CODE SECTION */}
+              {codeModules.length > 0 && (
+                <div className="border border-blue-500/30 rounded-lg overflow-hidden">
+                  <div className="flex items-center gap-2 p-2 bg-blue-500/10 border-b border-blue-500/20">
+                    <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+                    <span className="text-[11px] text-blue-300 font-bold uppercase tracking-wider">Code</span>
+                    <span className="text-[9px] text-blue-400/60 ml-auto">{codeModules.reduce((acc, m) => acc + groupedDocuments.code[m].length, 0)} files</span>
                   </div>
-                );
-              })}
+                  <div className="space-y-1 p-2">
+                    {codeModules.map((moduleName) => {
+                      const moduleDocs = groupedDocuments.code[moduleName];
+                      const isExpanded = expandedModules.has(`code-${moduleName}`);
+                      const allSelected = moduleDocs.every(d => d.isSelected);
+                      const someSelected = moduleDocs.some(d => d.isSelected);
+
+                      return (
+                        <div key={`code-${moduleName}`} className="border border-gray-800 rounded-lg overflow-hidden">
+                          <div
+                            className="flex items-center justify-between p-2 bg-black/20 cursor-pointer hover:bg-black/30 transition-colors"
+                            onClick={() => toggleModule(`code-${moduleName}`)}
+                          >
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={allSelected}
+                                ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                                onChange={(e) => { e.stopPropagation(); toggleAllInModule(moduleName, !allSelected, 'code'); }}
+                                className="w-3.5 h-3.5 rounded border-gray-700 bg-transparent text-blue-500 focus:ring-blue-500 cursor-pointer"
+                              />
+                              <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>
+                              <span className="text-[11px] text-gray-300 font-medium truncate">{moduleName}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9px] text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded">{moduleDocs.length}</span>
+                              <svg className={`w-3 h-3 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                          </div>
+                          {isExpanded && (
+                            <div className="max-h-48 overflow-y-auto bg-black/10">
+                              {moduleDocs.slice(0, 20).map((doc) => (
+                                <div key={doc.id} className="flex items-center justify-between px-3 py-1.5 hover:bg-white/5 transition-colors text-[10px]">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <input type="checkbox" checked={doc.isSelected} onChange={() => onToggleDocSelection(doc.id)} className="w-3 h-3 rounded border-gray-700 bg-transparent text-blue-500 focus:ring-blue-500 cursor-pointer" />
+                                    <span className="text-gray-400 truncate">{doc.name}</span>
+                                  </div>
+                                  <button onClick={() => onRemoveDoc(doc.id)} className="text-gray-600 hover:text-red-400 p-0.5">
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                  </button>
+                                </div>
+                              ))}
+                              {moduleDocs.length > 20 && (
+                                <div className="px-3 py-2 text-[9px] text-gray-600 text-center border-t border-gray-800">... and {moduleDocs.length - 20} more</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* DOCS SECTION */}
+              {docsModules.length > 0 && (
+                <div className="border border-green-500/30 rounded-lg overflow-hidden">
+                  <div className="flex items-center gap-2 p-2 bg-green-500/10 border-b border-green-500/20">
+                    <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    <span className="text-[11px] text-green-300 font-bold uppercase tracking-wider">Docs</span>
+                    <span className="text-[9px] text-green-400/60 ml-auto">{docsModules.reduce((acc, m) => acc + groupedDocuments.docs[m].length, 0)} files</span>
+                  </div>
+                  <div className="space-y-1 p-2">
+                    {docsModules.map((moduleName) => {
+                      const moduleDocs = groupedDocuments.docs[moduleName];
+                      const isExpanded = expandedModules.has(`docs-${moduleName}`);
+                      const allSelected = moduleDocs.every(d => d.isSelected);
+                      const someSelected = moduleDocs.some(d => d.isSelected);
+
+                      return (
+                        <div key={`docs-${moduleName}`} className="border border-gray-800 rounded-lg overflow-hidden">
+                          <div
+                            className="flex items-center justify-between p-2 bg-black/20 cursor-pointer hover:bg-black/30 transition-colors"
+                            onClick={() => toggleModule(`docs-${moduleName}`)}
+                          >
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={allSelected}
+                                ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                                onChange={(e) => { e.stopPropagation(); toggleAllInModule(moduleName, !allSelected, 'docs'); }}
+                                className="w-3.5 h-3.5 rounded border-gray-700 bg-transparent text-green-500 focus:ring-green-500 cursor-pointer"
+                              />
+                              <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>
+                              <span className="text-[11px] text-gray-300 font-medium truncate">{moduleName}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9px] text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded">{moduleDocs.length}</span>
+                              <svg className={`w-3 h-3 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                          </div>
+                          {isExpanded && (
+                            <div className="max-h-48 overflow-y-auto bg-black/10">
+                              {moduleDocs.slice(0, 20).map((doc) => (
+                                <div key={doc.id} className="flex items-center justify-between px-3 py-1.5 hover:bg-white/5 transition-colors text-[10px]">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <input type="checkbox" checked={doc.isSelected} onChange={() => onToggleDocSelection(doc.id)} className="w-3 h-3 rounded border-gray-700 bg-transparent text-green-500 focus:ring-green-500 cursor-pointer" />
+                                    <span className="text-gray-400 truncate">{doc.name}</span>
+                                  </div>
+                                  <button onClick={() => onRemoveDoc(doc.id)} className="text-gray-600 hover:text-red-400 p-0.5">
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                  </button>
+                                </div>
+                              ))}
+                              {moduleDocs.length > 20 && (
+                                <div className="px-3 py-2 text-[9px] text-gray-600 text-center border-t border-gray-800">... and {moduleDocs.length - 20} more</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

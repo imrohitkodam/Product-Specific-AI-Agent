@@ -232,6 +232,26 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               </div>
             ))}
 
+
+            {/* Loading Indicator */}
+            {isLoading && (
+              <div className="flex gap-4">
+                <div className="flex flex-col items-start w-full">
+                  <div className="mb-1">
+                    <SparkleIcon />
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <div className="flex gap-1">
+                      <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                    <span className="text-sm">Thinking...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div ref={messagesEndRef} />
           </div>
         )}

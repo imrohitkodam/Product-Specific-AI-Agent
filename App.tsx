@@ -99,9 +99,18 @@ const App: React.FC = () => {
         const convs = await loadConversations();
         setConversations(convs);
 
-        // If no current conversation, create a new one
+        // If no current conversation, create a new one inline
         if (convs.length === 0) {
-          await createNewConversation();
+          const newConv: Conversation = {
+            id: `conv_${Date.now()}`,
+            title: 'New Chat',
+            created_at: Date.now(),
+            updated_at: Date.now()
+          };
+          await saveConversation(newConv);
+          setConversations([newConv]);
+          setCurrentConversationId(newConv.id);
+          setMessages([]);
         } else {
           // Load the most recent conversation
           setCurrentConversationId(convs[0].id);

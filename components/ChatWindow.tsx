@@ -238,7 +238,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               <div className="flex gap-4">
                 <div className="flex flex-col items-start w-full">
                   <div className="mb-1">
-                    <SparkleIcon />
+                    {/* <SparkleIcon /> */}
                   </div>
                   <div className="flex items-center gap-2 text-gray-400">
                     <div className="flex gap-1">

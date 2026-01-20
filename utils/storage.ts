@@ -5,7 +5,9 @@ const DB_NAME = 'DocumindDB';
 const STORE_NAME = 'documents';
 const EMBEDDINGS_STORE_NAME = 'embeddings';
 const KNOWLEDGE_STORE_NAME = 'knowledge_base';
-const DB_VERSION = 3;
+const CONVERSATIONS_STORE_NAME = 'conversations';
+const CHAT_MESSAGES_STORE_NAME = 'chat_messages';
+const DB_VERSION = 4; // Increment version for new stores
 
 export const initDB = (): Promise<void> => {
   return new Promise((resolve, reject) => {
@@ -24,6 +26,13 @@ export const initDB = (): Promise<void> => {
       }
       if (!db.objectStoreNames.contains(KNOWLEDGE_STORE_NAME)) {
         db.createObjectStore(KNOWLEDGE_STORE_NAME, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(CONVERSATIONS_STORE_NAME)) {
+        db.createObjectStore(CONVERSATIONS_STORE_NAME, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(CHAT_MESSAGES_STORE_NAME)) {
+        const messagesStore = db.createObjectStore(CHAT_MESSAGES_STORE_NAME, { keyPath: 'id' });
+        messagesStore.createIndex('conversation_id', 'conversation_id', { unique: false });
       }
     };
   });

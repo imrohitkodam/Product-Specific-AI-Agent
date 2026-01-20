@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatWindow from './components/ChatWindow';
+import { ChatSidebar } from './components/ChatSidebar';
 import { Document, Message, RAGResponse } from './types';
 import { processFile } from './utils/fileProcessor';
 import { geminiService } from './services/geminiService';
@@ -12,6 +13,7 @@ import { initDB, loadDocuments, saveDocuments, saveEmbeddings, loadEmbeddings, c
 import { splitTextIntoChunks } from './utils/textSplitter';
 import { findMostRelevantChunks, EmbeddedChunk } from './utils/vectorStore';
 import { supabaseService } from './services/supabaseService';
+import { Conversation, ChatMessage, saveConversation, loadConversations, deleteConversation, saveChatMessage, loadChatMessages } from './utils/chatStorage';
 
 const App: React.FC = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -24,6 +26,10 @@ const App: React.FC = () => {
     return localStorage.getItem('is_admin_mode') === 'true';
   });
   const [isStorageReady, setIsStorageReady] = useState(false);
+
+  // Chat History State
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -87,7 +93,35 @@ const App: React.FC = () => {
         setIsStorageReady(true);
       }
     };
+
+    const loadChats = async () => {
+      try {
+        const convs = await loadConversations();
+        setConversations(convs);
+
+        // If no current conversation, create a new one
+        if (convs.length === 0) {
+          await createNewConversation();
+        } else {
+          // Load the most recent conversation
+          setCurrentConversationId(convs[0].id);
+          const msgs = await loadChatMessages(convs[0].id);
+          setMessages(msgs.map(m => ({
+            role: m.role,
+            content: m.content,
+            timestamp: m.timestamp,
+            issueType: m.issueType,
+            suggestedPatch: m.suggestedPatch,
+            citations: m.citations
+          })));
+        }
+      } catch (error) {
+        console.error('Failed to load conversations:', error);
+      }
+    };
+
     init();
+    loadChats();
   }, []);
 
   useEffect(() => {
@@ -229,6 +263,48 @@ const App: React.FC = () => {
     return results;
   };
 
+  // Conversation Management Functions
+  const createNewConversation = async () => {
+    const newConv: Conversation = {
+      id: `conv_${Date.now()}`,
+      title: 'New Chat',
+      created_at: Date.now(),
+      updated_at: Date.now()
+    };
+    await saveConversation(newConv);
+    setConversations(prev => [newConv, ...prev]);
+    setCurrentConversationId(newConv.id);
+    setMessages([]);
+  };
+
+  const switchConversation = async (id: string) => {
+    setCurrentConversationId(id);
+    const msgs = await loadChatMessages(id);
+    setMessages(msgs.map(m => ({
+      role: m.role,
+      content: m.content,
+      timestamp: m.timestamp,
+      issueType: m.issueType,
+      suggestedPatch: m.suggestedPatch,
+      citations: m.citations
+    })));
+  };
+
+  const handleDeleteConversation = async (id: string) => {
+    await deleteConversation(id);
+    setConversations(prev => prev.filter(c => c.id !== id));
+
+    // If deleted current conversation, switch to another or create new
+    if (currentConversationId === id) {
+      const remaining = conversations.filter(c => c.id !== id);
+      if (remaining.length > 0) {
+        await switchConversation(remaining[0].id);
+      } else {
+        await createNewConversation();
+      }
+    }
+  };
+
   const handleSendMessage = async (content: string, pendingFiles?: File[]) => {
     let currentDocs = [...documents];
 
@@ -341,6 +417,39 @@ const App: React.FC = () => {
       // 4. Learn from this interaction
       await learningService.learnSolution(content, response);
 
+      // 5. Auto-save messages to IndexedDB
+      if (currentConversationId) {
+        // Save user message
+        const userChatMsg: ChatMessage = {
+          id: `msg_${Date.now()}_user`,
+          conversation_id: currentConversationId,
+          ...userMsg
+        };
+        await saveChatMessage(userChatMsg);
+
+        // Save assistant message
+        const assistantChatMsg: ChatMessage = {
+          id: `msg_${Date.now()}_assistant`,
+          conversation_id: currentConversationId,
+          role: 'assistant',
+          content: response.answer,
+          timestamp: Date.now(),
+          issueType: response.issueType,
+          suggestedPatch: response.suggestedPatch,
+          citations: response.citations
+        };
+        await saveChatMessage(assistantChatMsg);
+
+        // Update conversation title if it's the first message
+        const currentConv = conversations.find(c => c.id === currentConversationId);
+        if (currentConv && currentConv.title === 'New Chat') {
+          const newTitle = content.slice(0, 50) + (content.length > 50 ? '...' : '');
+          const updatedConv = { ...currentConv, title: newTitle, updated_at: Date.now() };
+          await saveConversation(updatedConv);
+          setConversations(prev => prev.map(c => c.id === currentConversationId ? updatedConv : c));
+        }
+      }
+
     } catch (error: any) {
       const errorMessage = error.message || '';
       if (errorMessage.includes("Requested entity was not found") || (error.status === 404) || (error.code === 404)) {
@@ -373,6 +482,27 @@ const App: React.FC = () => {
       )}
 
       <div className="flex-1 flex overflow-hidden relative">
+        {/* Chat Sidebar (Left) */}
+        <ChatSidebar
+          conversations={conversations}
+          currentConversationId={currentConversationId}
+          onSelectConversation={switchConversation}
+          onNewConversation={createNewConversation}
+          onDeleteConversation={handleDeleteConversation}
+        />
+
+        {/* Chat Window (Center) */}
+        <ChatWindow
+          messages={messages} onSendMessage={handleSendMessage}
+          onFileUpload={handleFileUpload} isLoading={isLoading}
+          hasDocs={documents.some(d => d.status === 'ready')}
+          selectedDocCount={documents.filter(d => d.isSelected).length}
+          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+          isSidebarOpen={isSidebarOpen}
+          isAdmin={isAdmin}
+        />
+
+        {/* Knowledge Base Sidebar (Right) */}
         {isAdmin && (
           <div className={`transition-all duration-300 ease-in-out h-full overflow-hidden absolute lg:relative z-30 shadow-2xl ${isSidebarOpen ? 'w-[340px] translate-x-0' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-0'}`}>
             <Sidebar
@@ -385,15 +515,6 @@ const App: React.FC = () => {
             />
           </div>
         )}
-        <ChatWindow
-          messages={messages} onSendMessage={handleSendMessage}
-          onFileUpload={handleFileUpload} isLoading={isLoading}
-          hasDocs={documents.some(d => d.status === 'ready')}
-          selectedDocCount={documents.filter(d => d.isSelected).length}
-          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-          isSidebarOpen={isSidebarOpen}
-          isAdmin={isAdmin}
-        />
       </div>
     </div>
   );

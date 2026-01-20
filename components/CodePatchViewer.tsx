@@ -18,12 +18,12 @@ export const CodePatchViewer: React.FC<CodePatchViewerProps> = ({ patchText }) =
             <div className="bg-[#1a1b1e] border border-gray-800 rounded-lg overflow-hidden mt-3">
                 <div className="flex items-center justify-between p-3 bg-black/20 border-b border-gray-800">
                     <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">Suggested Patch</span>
-                    <button
+                    {/* <button
                         onClick={() => navigator.clipboard.writeText(patchText)}
                         className="text-[10px] text-purple-400 hover:text-purple-300 font-bold uppercase tracking-wider transition-colors"
                     >
                         COPY
-                    </button>
+                    </button> */}
                 </div>
                 <pre className="p-4 text-[12px] font-mono text-gray-300 overflow-x-auto max-h-96">
                     <code>{patchText}</code>
@@ -77,12 +77,12 @@ const FileChangeCard: React.FC<{ file: FilePatch }> = ({ file }) => {
                     {addedLines.length > 0 && (
                         <span className="text-[10px] text-green-400 font-mono">+{addedLines.length}</span>
                     )}
-                    <button
+                    {/* <button
                         onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(fullCode); }}
                         className="text-[10px] text-purple-400 hover:text-purple-300 font-bold uppercase tracking-wider transition-colors"
                     >
                         COPY
-                    </button>
+                    </button> */}
                     <svg
                         className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                         fill="none"
@@ -102,10 +102,10 @@ const FileChangeCard: React.FC<{ file: FilePatch }> = ({ file }) => {
                             <div
                                 key={idx}
                                 className={`${change.type === 'add'
-                                        ? 'bg-green-500/10 text-green-300'
-                                        : change.type === 'remove'
-                                            ? 'bg-red-500/10 text-red-300'
-                                            : 'text-gray-400'
+                                    ? 'bg-green-500/10 text-green-300'
+                                    : change.type === 'remove'
+                                        ? 'bg-red-500/10 text-red-300'
+                                        : 'text-gray-400'
                                     }`}
                             >
                                 <span className="select-none mr-2 opacity-50">

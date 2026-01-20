@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatWindow from './components/ChatWindow';
-import { Document, Message } from './types';
+import { Document, Message, RAGResponse } from './types';
 import { processFile } from './utils/fileProcessor';
 import { geminiService } from './services/geminiService';
 import { crewService } from './services/crewService';
@@ -289,43 +289,54 @@ const App: React.FC = () => {
         }
       }
 
-      // const response = await geminiService.queryDocuments(content, selectedDocs, contextString);
+      // SMART ROUTING: Use CrewAI only for code issues, direct Gemini for docs
+      const selectedCodeFiles = selectedDocs.filter(doc => doc.category === 'code');
+      const selectedDocsFiles = selectedDocs.filter(doc => doc.category === 'docs');
 
-      // Use CrewAI Workflow
-      // Construct context string if not already done by vector search
-      if (!contextString) {
-        contextString = selectedDocs
-          .filter(doc => doc.status === 'ready' && !doc.type.startsWith('image/'))
-          .slice(0, 5) // LIMIT FALLBACK TO 5 FILES TO AVOID MEMORY LAG
-          .map(doc => `--- FILE: ${doc.path} (Module: ${doc.moduleName}) ---\n${doc.content}\n`)
-          .join('\n\n');
-      }
+      // Detect if query is code-related
+      const codeKeywords = ['error', 'bug', 'fix', 'issue', 'not working', 'class', 'function', 'deprecated', 'fatal', 'warning', 'exception', 'undefined', 'not found'];
+      const isCodeQuery = codeKeywords.some(kw => content.toLowerCase().includes(kw)) || selectedCodeFiles.length > 0;
 
-      // Add a temporary message to show status updates
-      const tempMsgId = Date.now();
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: "Processing...",
-        timestamp: tempMsgId
-      }]);
+      let response: RAGResponse;
 
-      const response = await crewService.runCrewWorkflow(content, contextString || "", (status) => {
-        // Keep it simple as per user request
+      if (isCodeQuery && selectedCodeFiles.length > 0) {
+        // CODE ISSUE → Use CrewAI (3 agents for detailed analysis)
+        const tempMsgId = Date.now();
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: "Processing...",
+          timestamp: tempMsgId
+        }]);
+
+        response = await crewService.runCrewWorkflow(content, contextString || "", (status) => {
+          setMessages(prev => prev.map(msg =>
+            msg.timestamp === tempMsgId ? { ...msg, content: "Processing..." } : msg
+          ));
+        });
+
+        // Update the temporary message with the final response
         setMessages(prev => prev.map(msg =>
-          msg.timestamp === tempMsgId ? { ...msg, content: "Processing..." } : msg
+          msg.timestamp === tempMsgId ? {
+            ...msg,
+            content: response.answer,
+            issueType: response.issueType,
+            suggestedPatch: response.suggestedPatch,
+            citations: response.citations
+          } : msg
         ));
-      });
+      } else {
+        // DOCS QUESTION → Use direct Gemini (fast, 1 call)
+        response = await geminiService.queryDocuments(content, selectedDocs, contextString);
 
-      // Update the temporary message with the final response
-      setMessages(prev => prev.map(msg =>
-        msg.timestamp === tempMsgId ? {
-          ...msg,
+        setMessages(prev => [...prev, {
+          role: 'assistant',
           content: response.answer,
           issueType: response.issueType,
           suggestedPatch: response.suggestedPatch,
-          citations: response.citations
-        } : msg
-      ));
+          citations: response.citations,
+          timestamp: Date.now()
+        }]);
+      }
 
       // 4. Learn from this interaction
       await learningService.learnSolution(content, response);

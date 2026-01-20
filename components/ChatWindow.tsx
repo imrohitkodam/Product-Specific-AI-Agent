@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Message } from '../types';
+import { CodePatchViewer } from './CodePatchViewer';
 
 interface ChatWindowProps {
   messages: Message[];
@@ -194,15 +195,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                         {msg.content}
                       </ReactMarkdown>
                       {msg.suggestedPatch && isAdmin && (
-                        <div className="mt-4 rounded-xl overflow-hidden border border-white/10 bg-[#0d1117] w-full">
-                          <div className="bg-[#1e1f20] px-4 py-2 text-[10px] font-mono text-gray-400 flex justify-between items-center border-b border-white/5">
-                            <span>SUGGESTED PATCH</span>
-                            <button onClick={() => navigator.clipboard.writeText(msg.suggestedPatch!)} className="hover:text-white transition-colors">COPY</button>
-                          </div>
-                          <pre className="p-4 text-[12px] font-mono text-gray-300 overflow-x-auto">
-                            <code>{msg.suggestedPatch}</code>
-                          </pre>
-                        </div>
+                        <CodePatchViewer patchText={msg.suggestedPatch} />
                       )}
                       <div className="mt-2 opacity-0 group-hover/msg:opacity-100 transition-opacity flex gap-2">
                         <CopyButton text={msg.content} />

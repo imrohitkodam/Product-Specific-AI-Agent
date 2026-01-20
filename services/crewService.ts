@@ -26,13 +26,26 @@ export class CrewService {
 
       TASK:
       Analyze the provided code context and user query. 
-      Identify the ROOT CAUSE of the issue. 
-      Do NOT write the final code fix yet. 
-      Create a detailed STEP-BY-STEP PLAN for a developer to fix it.
+      Identify the ROOT CAUSE of the issue.
+      
+      CRITICAL REQUIREMENTS:
+      1. You MUST identify the EXACT FILE PATH(S) where the issue exists
+      2. You MUST specify approximate LINE NUMBERS or function names
+      3. Provide a clear diagnosis of what's wrong
+      4. Create a step-by-step plan for fixing it
       
       OUTPUT FORMAT:
-      - Root Cause: <explanation>
-      - Plan: <step 1, step 2...>
+      **Root Cause:**
+      <Clear explanation of the problem>
+      
+      **Affected Files:**
+      - File: <exact/path/to/file.php>
+        Location: Line X or function functionName()
+        Issue: <what's wrong here>
+      
+      **Fix Plan:**
+      1. <Step 1 with file reference>
+      2. <Step 2 with file reference>
     `;
 
         const analystResponse = await this.ai.models.generateContent({
@@ -58,11 +71,31 @@ export class CrewService {
 
       TASK:
       Implement the fix strictly following the Analyst's plan.
-      Generate the code changes required.
+      
+      CRITICAL REQUIREMENTS:
+      1. For EACH file that needs changes, provide:
+         - Exact file path
+         - Current code (what to replace)
+         - New code (replacement)
+      2. Use this format for EVERY change:
       
       OUTPUT FORMAT:
-      Provide the code changes in a clear, readable format (or Unified Diff if applicable).
-      Focus ONLY on the code.
+      For each file:
+      
+      📁 **File:** <exact/path/to/file.php>
+      📍 **Location:** Line X or function functionName()
+      
+      ❌ **Current Code:**
+      \`\`\`php
+      <existing code to be replaced>
+      \`\`\`
+      
+      ✅ **Replace With:**
+      \`\`\`php
+      <new corrected code>
+      \`\`\`
+      
+      Repeat this format for each file that needs changes.
     `;
 
         const developerResponse = await this.ai.models.generateContent({

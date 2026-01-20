@@ -99,15 +99,47 @@ async function processZip(file: File | Blob): Promise<Partial<Document>[]> {
   const content = await zip.loadAsync(file);
   const processedDocs: Partial<Document>[] = [];
 
+  // PASS 1: Find the Joomla manifest file to get the package/module name
+  let packageModuleName = 'General';
+  for (const [relativePath, zipEntry] of Object.entries(content.files)) {
+    if ((zipEntry as any).dir) continue;
+    if (relativePath.endsWith('.xml')) {
+      try {
+        const blob = await (zipEntry as any).async("blob");
+        const text = await blob.text();
+        const isManifest = text.includes('<extension') || text.includes('<install');
+        if (isManifest) {
+          const nameMatch = text.match(/<name>(.*?)<\/name>/);
+          if (nameMatch) {
+            packageModuleName = nameMatch[1];
+            break; // Found the manifest, no need to continue
+          }
+        }
+      } catch (err) {
+        // Ignore errors during manifest search
+      }
+    }
+  }
+
+  // PASS 2: Process all files and apply the package module name
   for (const [relativePath, zipEntry] of Object.entries(content.files)) {
     if ((zipEntry as any).dir) continue;
     try {
       const blob = await (zipEntry as any).async("blob");
       const result = await processFile(blob, relativePath);
       if (Array.isArray(result)) {
-        processedDocs.push(...result);
+        // Nested ZIP - apply package name to all
+        processedDocs.push(...result.map(doc => ({ ...doc, moduleName: packageModuleName })));
       } else {
-        processedDocs.push({ ...result, name: relativePath, path: relativePath });
+        // Override moduleName with package name (except for images which stay in Visual Feedback)
+        const ext = relativePath.split('.').pop()?.toLowerCase() || '';
+        const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext);
+        processedDocs.push({
+          ...result,
+          name: relativePath,
+          path: relativePath,
+          moduleName: isImage ? 'Visual Feedback' : packageModuleName
+        });
       }
     } catch (err) {
       console.warn(`Skipping: ${relativePath}`, err);

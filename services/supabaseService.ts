@@ -1,18 +1,27 @@
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Document, KnowledgeItem } from '../types';
 import { EmbeddedChunk } from '../utils/vectorStore';
 
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Lazy initialization to avoid error when env vars are not set
+let supabase: SupabaseClient | null = null;
+const getSupabase = (): SupabaseClient | null => {
+    if (!supabaseUrl || !supabaseAnonKey) return null;
+    if (!supabase) {
+        supabase = createClient(supabaseUrl, supabaseAnonKey);
+    }
+    return supabase;
+};
 
 export class SupabaseService {
     async upsertDocuments(documents: Document[]) {
-        if (!supabaseUrl || !supabaseAnonKey) return;
+        const client = getSupabase();
+        if (!client) return;
 
-        const { error } = await supabase
+        const { error } = await client
             .from('documents')
             .upsert(documents.map(doc => ({
                 id: doc.id,
@@ -30,9 +39,10 @@ export class SupabaseService {
     }
 
     async upsertEmbeddings(chunks: EmbeddedChunk[]) {
-        if (!supabaseUrl || !supabaseAnonKey) return;
+        const client = getSupabase();
+        if (!client) return;
 
-        const { error } = await supabase
+        const { error } = await client
             .from('embeddings')
             .upsert(chunks.map(chunk => ({
                 id: chunk.id,
@@ -47,9 +57,10 @@ export class SupabaseService {
     }
 
     async upsertKnowledge(item: KnowledgeItem) {
-        if (!supabaseUrl || !supabaseAnonKey) return;
+        const client = getSupabase();
+        if (!client) return;
 
-        const { error } = await supabase
+        const { error } = await client
             .from('knowledge_base')
             .upsert({
                 id: item.id,
@@ -63,12 +74,13 @@ export class SupabaseService {
     }
 
     async fetchAllSharedData() {
-        if (!supabaseUrl || !supabaseAnonKey) return { documents: [], embeddings: [], knowledge: [] };
+        const client = getSupabase();
+        if (!client) return { documents: [], embeddings: [], knowledge: [] };
 
         const [docsRes, embeddingsRes, knowledgeRes] = await Promise.all([
-            supabase.from('documents').select('*'),
-            supabase.from('embeddings').select('*'),
-            supabase.from('knowledge_base').select('*')
+            client.from('documents').select('*'),
+            client.from('embeddings').select('*'),
+            client.from('knowledge_base').select('*')
         ]);
 
         return {

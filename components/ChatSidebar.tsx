@@ -1,5 +1,6 @@
 import React from 'react';
 import { Conversation } from '../utils/chatStorage';
+import { User } from '@supabase/supabase-js';
 
 interface ChatSidebarProps {
     conversations: Conversation[];
@@ -7,6 +8,8 @@ interface ChatSidebarProps {
     onSelectConversation: (id: string) => void;
     onNewConversation: () => void;
     onDeleteConversation: (id: string) => void;
+    user: User | null;
+    onSignOut: () => void;
 }
 
 export const ChatSidebar: React.FC<ChatSidebarProps> = ({
@@ -14,7 +17,9 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
     currentConversationId,
     onSelectConversation,
     onNewConversation,
-    onDeleteConversation
+    onDeleteConversation,
+    user,
+    onSignOut
 }) => {
     return (
         <div className="w-64 bg-[#1e1f20] border-r border-gray-800 flex flex-col h-full">
@@ -43,8 +48,8 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                             <div
                                 key={conv.id}
                                 className={`group relative flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${currentConversationId === conv.id
-                                        ? 'bg-purple-600/20 text-white'
-                                        : 'hover:bg-gray-800 text-gray-300'
+                                    ? 'bg-purple-600/20 text-white'
+                                    : 'hover:bg-gray-800 text-gray-300'
                                     }`}
                                 onClick={() => onSelectConversation(conv.id)}
                             >
@@ -75,8 +80,27 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-gray-800 text-xs text-gray-500 text-center">
-                {conversations.length} conversation{conversations.length !== 1 ? 's' : ''}
+            <div className="p-4 border-t border-gray-800 bg-[#1a1b1e]">
+                {user && (
+                    <div className="mb-4 flex items-center gap-3 px-1">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-600 to-blue-500 flex items-center justify-center text-[10px] font-bold text-white uppercase">
+                            {user.email?.slice(0, 2)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-200 truncate">{user.email}</p>
+                            <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Free Member</p>
+                        </div>
+                    </div>
+                )}
+                <button
+                    onClick={onSignOut}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-all text-xs font-medium border border-transparent hover:border-white/10"
+                >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Sign Out
+                </button>
             </div>
         </div>
     );

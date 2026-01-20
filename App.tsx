@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatWindow from './components/ChatWindow';
 import { ChatSidebar } from './components/ChatSidebar';
+import { Auth } from './components/Auth';
 import { Document, Message, RAGResponse } from './types';
 import { processFile } from './utils/fileProcessor';
 import { geminiService } from './services/geminiService';
@@ -12,7 +13,8 @@ import { shadowIndexer } from './services/shadowIndexer';
 import { initDB, loadDocuments, saveDocuments, saveEmbeddings, loadEmbeddings, clearAllData, saveKnowledge } from './utils/storage';
 import { splitTextIntoChunks } from './utils/textSplitter';
 import { findMostRelevantChunks, EmbeddedChunk } from './utils/vectorStore';
-import { supabaseService } from './services/supabaseService';
+import { supabaseService, CloudConversation, CloudChatMessage } from './services/supabaseService';
+import { User } from '@supabase/supabase-js';
 import { Conversation, ChatMessage, saveConversation, loadConversations, deleteConversation, saveChatMessage, loadChatMessages } from './utils/chatStorage';
 
 const App: React.FC = () => {
@@ -28,9 +30,23 @@ const App: React.FC = () => {
   });
   const [isStorageReady, setIsStorageReady] = useState(false);
 
+  // Auth State
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+
   // Chat History State
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Listen for auth changes
+    const unsubscribe = supabaseService.onAuthStateChange((newUser) => {
+      setUser(newUser);
+      setIsAuthLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const init = async () => {
@@ -96,30 +112,48 @@ const App: React.FC = () => {
     };
 
     const loadChats = async () => {
-      try {
-        const convs = await loadConversations();
-        setConversations(convs);
+      if (!user) return; // Wait for user
 
-        // If no current conversation, create a new one inline
-        if (convs.length === 0) {
+      try {
+        // Prefer Cloud Storage for authenticated users
+        const convs = await supabaseService.fetchConversations(user.id);
+
+        // Convert CloudConversation to local Conversation type for UI compatibility
+        const mappedConvs: Conversation[] = convs.map(c => ({
+          id: c.id,
+          title: c.title,
+          created_at: Number(c.created_at),
+          updated_at: Number(c.updated_at)
+        }));
+
+        setConversations(mappedConvs);
+
+        if (mappedConvs.length === 0) {
           const newConv: Conversation = {
             id: `conv_${Date.now()}`,
             title: 'New Chat',
             created_at: Date.now(),
             updated_at: Date.now()
           };
-          await saveConversation(newConv);
+
+          await supabaseService.saveConversation({
+            id: newConv.id,
+            user_id: user.id,
+            title: newConv.title,
+            created_at: newConv.created_at,
+            updated_at: newConv.updated_at
+          });
+
           setConversations([newConv]);
           setCurrentConversationId(newConv.id);
           setMessages([]);
         } else {
-          // Load the most recent conversation
-          setCurrentConversationId(convs[0].id);
-          const msgs = await loadChatMessages(convs[0].id);
+          setCurrentConversationId(mappedConvs[0].id);
+          const msgs = await supabaseService.loadChatMessages(mappedConvs[0].id);
           setMessages(msgs.map(m => ({
             role: m.role,
             content: m.content,
-            timestamp: m.timestamp,
+            timestamp: Number(m.timestamp),
             issueType: m.issueType,
             suggestedPatch: m.suggestedPatch,
             citations: m.citations
@@ -130,9 +164,11 @@ const App: React.FC = () => {
       }
     };
 
-    init();
-    loadChats();
-  }, []);
+    if (user) {
+      init();
+      loadChats();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (isStorageReady) {
@@ -275,13 +311,22 @@ const App: React.FC = () => {
 
   // Conversation Management Functions
   const createNewConversation = async () => {
+    if (!user) return;
     const newConv: Conversation = {
       id: `conv_${Date.now()}`,
       title: 'New Chat',
       created_at: Date.now(),
       updated_at: Date.now()
     };
-    await saveConversation(newConv);
+
+    await supabaseService.saveConversation({
+      id: newConv.id,
+      user_id: user.id,
+      title: newConv.title,
+      created_at: newConv.created_at,
+      updated_at: newConv.updated_at
+    });
+
     setConversations(prev => [newConv, ...prev]);
     setCurrentConversationId(newConv.id);
     setMessages([]);
@@ -289,11 +334,11 @@ const App: React.FC = () => {
 
   const switchConversation = async (id: string) => {
     setCurrentConversationId(id);
-    const msgs = await loadChatMessages(id);
+    const msgs = await supabaseService.loadChatMessages(id);
     setMessages(msgs.map(m => ({
       role: m.role,
       content: m.content,
-      timestamp: m.timestamp,
+      timestamp: Number(m.timestamp),
       issueType: m.issueType,
       suggestedPatch: m.suggestedPatch,
       citations: m.citations
@@ -301,7 +346,7 @@ const App: React.FC = () => {
   };
 
   const handleDeleteConversation = async (id: string) => {
-    await deleteConversation(id);
+    await supabaseService.deleteConversation(id);
     setConversations(prev => prev.filter(c => c.id !== id));
 
     // If deleted current conversation, switch to another or create new
@@ -427,20 +472,22 @@ const App: React.FC = () => {
       // 4. Learn from this interaction
       await learningService.learnSolution(content, response);
 
-      // 5. Auto-save messages to IndexedDB
-      if (currentConversationId) {
+      // 5. Auto-save messages to Supabase
+      if (currentConversationId && user) {
         // Save user message
-        const userChatMsg: ChatMessage = {
+        const userCloudMsg: CloudChatMessage = {
           id: `msg_${Date.now()}_user`,
           conversation_id: currentConversationId,
+          user_id: user.id,
           ...userMsg
         };
-        await saveChatMessage(userChatMsg);
+        await supabaseService.saveChatMessage(userCloudMsg);
 
         // Save assistant message
-        const assistantChatMsg: ChatMessage = {
+        const assistantCloudMsg: CloudChatMessage = {
           id: `msg_${Date.now()}_assistant`,
           conversation_id: currentConversationId,
+          user_id: user.id,
           role: 'assistant',
           content: response.answer,
           timestamp: Date.now(),
@@ -448,14 +495,22 @@ const App: React.FC = () => {
           suggestedPatch: response.suggestedPatch,
           citations: response.citations
         };
-        await saveChatMessage(assistantChatMsg);
+        await supabaseService.saveChatMessage(assistantCloudMsg);
 
         // Update conversation title if it's the first message
         const currentConv = conversations.find(c => c.id === currentConversationId);
         if (currentConv && currentConv.title === 'New Chat') {
           const newTitle = content.slice(0, 50) + (content.length > 50 ? '...' : '');
           const updatedConv = { ...currentConv, title: newTitle, updated_at: Date.now() };
-          await saveConversation(updatedConv);
+
+          await supabaseService.saveConversation({
+            id: updatedConv.id,
+            user_id: user.id,
+            title: updatedConv.title,
+            created_at: updatedConv.created_at,
+            updated_at: updatedConv.updated_at
+          });
+
           setConversations(prev => prev.map(c => c.id === currentConversationId ? updatedConv : c));
         }
       }
@@ -477,20 +532,20 @@ const App: React.FC = () => {
     }
   };
 
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Auth />;
+  }
+
   return (
     <div className="flex flex-col h-screen w-full bg-[#1a1b1e] text-white overflow-hidden relative">
-      {requiresKey && isAdmin && (
-        <div className="absolute inset-0 bg-[#1a1b1e]/95 z-50 flex items-center justify-center p-6 text-center">
-          <div className="max-w-md bg-[#1e1f22] border notebook-border p-8 rounded-2xl shadow-2xl">
-            <h2 className="text-2xl font-bold mb-4">Admin API Setup</h2>
-            <p className="text-gray-400 text-sm mb-4">Required: Use a paid API key for high-priority coding analysis.</p>
-            <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="text-purple-400 text-xs hover:underline mb-6 block">Gemini Billing Dashboard</a>
-            <button onClick={handleOpenKeyDialog} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 rounded-xl transition-all shadow-lg active:scale-95">Select Paid API Key</button>
-            <p className="mt-4 text-[10px] text-gray-400">Authenticated as Developer</p>
-          </div>
-        </div>
-      )}
-
       <div className="flex-1 flex overflow-hidden relative">
         {/* Chat Sidebar (Left) */}
         <div className={`transition-all duration-300 ease-in-out h-full overflow-hidden absolute lg:relative z-30 shadow-2xl ${isChatSidebarOpen ? 'w-64 translate-x-0' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-0'}`}>
@@ -500,6 +555,8 @@ const App: React.FC = () => {
             onSelectConversation={switchConversation}
             onNewConversation={createNewConversation}
             onDeleteConversation={handleDeleteConversation}
+            user={user}
+            onSignOut={() => supabaseService.signOut()}
           />
         </div>
 

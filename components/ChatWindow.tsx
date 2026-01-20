@@ -13,8 +13,9 @@ interface ChatWindowProps {
   selectedDocCount: number;
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
+  onToggleChatSidebar: () => void;
+  isChatSidebarOpen: boolean;
   isAdmin: boolean;
-
 }
 
 const SparkleIcon = () => (
@@ -54,7 +55,8 @@ const CopyButton = ({ text }: { text: string }) => {
 };
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
-  messages, onSendMessage, onFileUpload, isLoading, hasDocs, selectedDocCount, onToggleSidebar, isSidebarOpen, isAdmin
+  messages, onSendMessage, onFileUpload, isLoading, hasDocs, selectedDocCount,
+  onToggleSidebar, isSidebarOpen, onToggleChatSidebar, isChatSidebarOpen, isAdmin
 }) => {
   const [input, setInput] = useState('');
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
@@ -106,10 +108,22 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       {/* Header */}
       <div className="flex items-center px-4 py-3 justify-between z-10 absolute top-0 left-0 right-0">
         <div className="flex items-center gap-2">
+          {/* Chat History Toggle (Left) */}
+          <button
+            onClick={onToggleChatSidebar}
+            className={`p-2 rounded-full hover:bg-white/10 transition-colors ${isChatSidebarOpen ? 'bg-white/10' : ''}`}
+            title="Chat History"
+          >
+            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            </svg>
+          </button>
+
           {isAdmin && (
             <button
               onClick={onToggleSidebar}
               className={`p-2 rounded-full hover:bg-white/10 transition-colors ${isSidebarOpen ? 'bg-white/10' : ''}`}
+              title="Knowledge Base"
             >
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>

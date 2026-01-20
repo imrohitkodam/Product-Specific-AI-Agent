@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(true);
   const [requiresKey, setRequiresKey] = useState(false);
   const [isAdmin, setIsAdmin] = useState(() => {
     return localStorage.getItem('is_admin_mode') === 'true';
@@ -492,13 +493,15 @@ const App: React.FC = () => {
 
       <div className="flex-1 flex overflow-hidden relative">
         {/* Chat Sidebar (Left) */}
-        <ChatSidebar
-          conversations={conversations}
-          currentConversationId={currentConversationId}
-          onSelectConversation={switchConversation}
-          onNewConversation={createNewConversation}
-          onDeleteConversation={handleDeleteConversation}
-        />
+        <div className={`transition-all duration-300 ease-in-out h-full overflow-hidden absolute lg:relative z-30 shadow-2xl ${isChatSidebarOpen ? 'w-64 translate-x-0' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-0'}`}>
+          <ChatSidebar
+            conversations={conversations}
+            currentConversationId={currentConversationId}
+            onSelectConversation={switchConversation}
+            onNewConversation={createNewConversation}
+            onDeleteConversation={handleDeleteConversation}
+          />
+        </div>
 
         {/* Chat Window (Center) */}
         <ChatWindow
@@ -508,6 +511,8 @@ const App: React.FC = () => {
           selectedDocCount={documents.filter(d => d.isSelected).length}
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           isSidebarOpen={isSidebarOpen}
+          onToggleChatSidebar={() => setIsChatSidebarOpen(!isChatSidebarOpen)}
+          isChatSidebarOpen={isChatSidebarOpen}
           isAdmin={isAdmin}
         />
 

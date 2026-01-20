@@ -285,9 +285,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               <button
                 onClick={handleSubmit}
                 disabled={isLoading}
-                className="p-2.5 text-[#e3e3e3] hover:bg-[#282a2c] rounded-full transition-all mb-1 mr-1"
+                className="p-3 bg-purple-600 hover:bg-purple-500 text-white rounded-full transition-all mb-1 mr-1 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <svg className="w-6 h-6 transform rotate-270" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                </svg>
               </button>
             )}
           </div>

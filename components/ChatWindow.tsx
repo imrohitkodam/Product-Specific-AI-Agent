@@ -162,8 +162,34 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                     </div>
                   )}
                   {msg.role === 'user' ? (
-                    <div className="bg-[#282a2c] text-[#e3e3e3] px-5 py-3 rounded-[20px] rounded-tr-sm text-[15px] leading-relaxed whitespace-pre-wrap">
-                      {msg.content}
+                    <div className="group/user relative">
+                      <div className="bg-[#282a2c] text-[#e3e3e3] px-5 py-3 rounded-[20px] rounded-tr-sm text-[15px] leading-relaxed whitespace-pre-wrap">
+                        {msg.content}
+                      </div>
+                      {/* Edit & Copy buttons on hover */}
+                      <div className="absolute -bottom-8 right-0 opacity-0 group-hover/user:opacity-100 transition-opacity flex gap-2">
+                        <button
+                          onClick={() => {
+                            setInput(msg.content);
+                            textareaRef.current?.focus();
+                          }}
+                          className="p-2 bg-[#1e1f20] hover:bg-[#282a2c] rounded-lg border border-gray-800 transition-colors"
+                          title="Edit"
+                        >
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => navigator.clipboard.writeText(msg.content)}
+                          className="p-2 bg-[#1e1f20] hover:bg-[#282a2c] rounded-lg border border-gray-800 transition-colors"
+                          title="Copy"
+                        >
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div className="text-[#e3e3e3] text-[15px] leading-relaxed group/msg markdown-content">

@@ -2,12 +2,14 @@
 import { Document } from '../types';
 
 type StatusCallback = (docId: string, status: 'indexing' | 'completed' | 'failed') => void;
+type DataCallback = (docId: string, chunks: any[]) => void;
 
 export class ShadowIndexer {
     private queue: Document[] = [];
     private activeWorkers = 0;
     private readonly MAX_CONCURRENT = 3;
     private onStatusUpdate: StatusCallback | null = null;
+    private onDataReady: DataCallback | null = null;
     private worker: Worker;
 
     constructor() {
@@ -15,8 +17,12 @@ export class ShadowIndexer {
         this.worker = new Worker(new URL('../workers/indexer.worker.ts', import.meta.url), { type: 'module' });
 
         this.worker.onmessage = (e) => {
-            const { type, docId, status } = e.data;
+            const { type, docId, status, chunks } = e.data;
             if (type === 'status') {
+                if (status === 'completed' && chunks && this.onDataReady) {
+                    this.onDataReady(docId, chunks);
+                }
+
                 if (this.onStatusUpdate) this.onStatusUpdate(docId, status);
 
                 if (status === 'completed' || status === 'failed') {
@@ -29,6 +35,10 @@ export class ShadowIndexer {
 
     setStatusCallback(callback: StatusCallback) {
         this.onStatusUpdate = callback;
+    }
+
+    setDataCallback(callback: DataCallback) {
+        this.onDataReady = callback;
     }
 
     queueDocument(doc: Document) {

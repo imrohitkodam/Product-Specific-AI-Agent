@@ -1,7 +1,5 @@
-
 import { Document } from '../types';
 import { geminiService } from '../services/geminiService';
-import { saveEmbeddings } from '../utils/storage';
 import { splitTextIntoChunks } from '../utils/textSplitter';
 import { EmbeddedChunk } from '../utils/vectorStore';
 
@@ -30,14 +28,16 @@ ctx.onmessage = async (e: MessageEvent<Document>) => {
                 }
             });
 
-            // 3. Save to DB (Async I/O)
-            if (chunksToEmbed.length > 0) {
-                await saveEmbeddings(chunksToEmbed);
-            }
+            // Notify success with data
+            ctx.postMessage({
+                type: 'status',
+                docId: doc.id,
+                status: 'completed',
+                chunks: chunksToEmbed
+            });
+        } else {
+            ctx.postMessage({ type: 'status', docId: doc.id, status: 'completed' });
         }
-
-        // Notify success
-        ctx.postMessage({ type: 'status', docId: doc.id, status: 'completed' });
 
     } catch (error) {
         console.error(`Worker Indexing failed for ${doc.name}:`, error);

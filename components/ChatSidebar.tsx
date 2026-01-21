@@ -10,6 +10,7 @@ interface ChatSidebarProps {
     onDeleteConversation: (id: string) => void;
     user: User | null;
     onSignOut: () => void;
+    storageNotice?: string;
 }
 
 export const ChatSidebar: React.FC<ChatSidebarProps> = ({
@@ -19,7 +20,8 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
     onNewConversation,
     onDeleteConversation,
     user,
-    onSignOut
+    onSignOut,
+    storageNotice
 }) => {
     return (
         <div className="w-64 bg-[#1e1f20] border-r border-gray-800 flex flex-col h-full">
@@ -35,6 +37,20 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                     New Chat
                 </button>
             </div>
+
+            {/* Storage Notice */}
+            {storageNotice && (
+                <div className="mx-2 mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                    <div className="flex items-start gap-2">
+                        <svg className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <div className="text-[10px] text-amber-200/80 leading-tight font-medium">
+                            {storageNotice}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Conversations List */}
             <div className="flex-1 overflow-y-auto">

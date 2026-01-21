@@ -87,6 +87,10 @@ export class SupabaseService {
 
         if (error) {
             console.error('Error fetching conversations:', error);
+            // If table doesn't exist, throw a specific error that the UI can catch
+            if (error.code === 'PGRST204' || error.code === 'PGRST205' || error.message.includes('not found')) {
+                throw new Error('DATABASE_TABLES_MISSING');
+            }
             return [];
         }
         return data || [];
@@ -127,6 +131,9 @@ export class SupabaseService {
 
         if (error) {
             console.error('Error loading chat messages:', error);
+            if (error.code === 'PGRST204' || error.code === 'PGRST205' || error.message.includes('not found')) {
+                throw new Error('DATABASE_TABLES_MISSING');
+            }
             return [];
         }
 
@@ -162,7 +169,24 @@ export class SupabaseService {
                 status: 'ready'
             })));
 
-        if (error) console.error('Error syncing documents to Supabase:', error);
+        if (error) {
+            console.error('Error syncing documents to Supabase:', error);
+            throw error;
+        }
+    }
+
+    async deleteDocument(id: string) {
+        const client = getSupabase();
+        if (!client) return;
+        const { error } = await client.from('documents').delete().eq('id', id);
+        if (error) console.error('Error deleting document:', error);
+    }
+
+    async deleteAllDocuments() {
+        const client = getSupabase();
+        if (!client) return;
+        const { error } = await client.from('documents').delete().neq('id', 'placeholder'); // Deletes all
+        if (error) console.error('Error clearing documents:', error);
     }
 
     async upsertEmbeddings(chunks: EmbeddedChunk[]) {

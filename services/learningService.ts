@@ -1,6 +1,5 @@
 
 import { geminiService } from './geminiService';
-import { loadKnowledge, saveKnowledge } from '../utils/storage';
 import { cosineSimilarity } from '../utils/vectorStore';
 import { RAGResponse, KnowledgeItem } from '../types';
 import { supabaseService } from './supabaseService';
@@ -18,8 +17,8 @@ export class LearningService {
 
             const queryEmbedding = embeddings[0];
 
-            // 2. Load all past knowledge
-            const knowledgeBase = await loadKnowledge();
+            // 2. Load all past knowledge from Supabase
+            const { knowledge: knowledgeBase } = await supabaseService.fetchAllSharedData();
             if (knowledgeBase.length === 0) return null;
 
             // 3. Find the best match
@@ -27,10 +26,11 @@ export class LearningService {
             let highestScore = -1;
 
             for (const item of knowledgeBase) {
+                if (!item.embedding || item.embedding.length !== queryEmbedding.length) continue;
                 const score = cosineSimilarity(queryEmbedding, item.embedding);
                 if (score > highestScore) {
                     highestScore = score;
-                    bestMatch = item;
+                    bestMatch = item as KnowledgeItem;
                 }
             }
 
@@ -63,8 +63,7 @@ export class LearningService {
                 timestamp: Date.now()
             };
 
-            // 3. Save to DB
-            await saveKnowledge(newItem);
+            // 3. Save to Supabase (Cloud-only)
             await supabaseService.upsertKnowledge(newItem);
             console.log("🧠 Learned new solution!");
 

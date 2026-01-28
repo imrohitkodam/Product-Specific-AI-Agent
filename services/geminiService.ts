@@ -1,10 +1,11 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { Document, RAGResponse, IssueType } from "../types";
 
 export class GeminiService {
   async getEmbeddings(texts: string[]): Promise<number[][]> {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const genAI = new GoogleGenerativeAI(process.env.API_KEY || '');
+    const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
 
     // Process in batches of 100 to avoid limits
     const BATCH_SIZE = 100;
@@ -14,10 +15,7 @@ export class GeminiService {
       const batch = texts.slice(i, i + BATCH_SIZE);
       try {
         const promises = batch.map(text =>
-          ai.models.embedContent({
-            model: 'text-embedding-004',
-            contents: { parts: [{ text }] }
-          })
+          model.embedContent(text)
         );
 
         const responses = await Promise.all(promises);
@@ -25,8 +23,6 @@ export class GeminiService {
         responses.forEach((response: any) => {
           if (response.embedding && response.embedding.values) {
             embeddings.push(response.embedding.values);
-          } else if (response.embeddings && response.embeddings.length > 0) {
-            embeddings.push(response.embeddings[0].values);
           }
         });
       } catch (error) {
@@ -40,7 +36,40 @@ export class GeminiService {
 
   async queryDocuments(query: string, documents: Document[], relevantContext?: string): Promise<RAGResponse> {
     console.log("Using API Key:", process.env.API_KEY?.substring(0, 10) + "...");
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const genAI = new GoogleGenerativeAI(process.env.API_KEY || '');
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: SchemaType.OBJECT,
+          properties: {
+            issueType: {
+              type: SchemaType.STRING,
+              format: 'enum',
+              enum: ['CODE_ISSUE', 'CONFIGURATION_ISSUE', 'UNKNOWN']
+            },
+            answer: { type: SchemaType.STRING },
+            suggestedPatch: {
+              type: SchemaType.STRING,
+              description: 'Unified Diff format patch if code fix is needed'
+            },
+            citations: {
+              type: SchemaType.ARRAY,
+              items: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  source: { type: SchemaType.STRING },
+                  text: { type: SchemaType.STRING }
+                },
+                required: ["source", "text"]
+              }
+            }
+          },
+          required: ["issueType", "answer", "citations"],
+        },
+      }
+    });
 
     // Separate text documents from image documents
     const textContext = relevantContext || documents
@@ -77,53 +106,23 @@ export class GeminiService {
     `;
 
     try {
-      const contents = {
-        parts: [
-          ...imageParts,
-          { text: systemPrompt }
-        ]
-      };
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              issueType: {
-                type: Type.STRING,
-                enum: ['CODE_ISSUE', 'CONFIGURATION_ISSUE', 'UNKNOWN']
-              },
-              answer: { type: Type.STRING },
-              suggestedPatch: {
-                type: Type.STRING,
-                description: 'Unified Diff format patch if code fix is needed'
-              },
-              citations: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    source: { type: Type.STRING },
-                    text: { type: Type.STRING }
-                  },
-                  required: ["source", "text"]
-                }
-              }
-            },
-            required: ["issueType", "answer", "citations"],
-          },
-        },
+      const result = await model.generateContent({
+        contents: [{
+          role: 'user',
+          parts: [
+            ...imageParts, // Correct mapping for inlineData
+            { text: systemPrompt }
+          ]
+        }]
       });
+      const responseText = result.response.text();
 
-      const result = JSON.parse(response.text || '{}');
+      const resultData = JSON.parse(responseText || '{}');
       return {
-        issueType: result.issueType as IssueType,
-        answer: result.answer,
-        suggestedPatch: result.suggestedPatch,
-        citations: result.citations || []
+        issueType: resultData.issueType as IssueType,
+        answer: resultData.answer,
+        suggestedPatch: resultData.suggestedPatch,
+        citations: resultData.citations || []
       };
     } catch (error: any) {
       console.error("Gemini Diagnosis Error:", error);

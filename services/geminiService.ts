@@ -5,7 +5,7 @@ import { Document, RAGResponse, IssueType } from "../types";
 export class GeminiService {
   async getEmbeddings(texts: string[]): Promise<number[][]> {
     const genAI = new GoogleGenerativeAI(process.env.API_KEY || '');
-    const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
+    const model = genAI.getGenerativeModel({ model: "models/gemini-embedding-001" });
 
     // Process in batches of 100 to avoid limits
     const BATCH_SIZE = 100;

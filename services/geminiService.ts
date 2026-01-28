@@ -15,7 +15,7 @@ export class GeminiService {
       try {
         const promises = batch.map(text =>
           ai.models.embedContent({
-            model: 'text-embedding-004',
+            model: 'embedding-001',
             contents: { parts: [{ text }] }
           })
         );
@@ -85,7 +85,7 @@ export class GeminiService {
       };
 
       const response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash',
         contents,
         config: {
           responseMimeType: "application/json",

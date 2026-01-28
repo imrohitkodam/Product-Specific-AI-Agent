@@ -1,6 +1,13 @@
 import React from 'react';
-import { Conversation } from '../utils/chatStorage';
 import { User } from '@supabase/supabase-js';
+
+// Local type definition (chatStorage was removed in cloud migration)
+interface Conversation {
+    id: string;
+    title: string;
+    created_at: number;
+    updated_at: number;
+}
 
 interface ChatSidebarProps {
     conversations: Conversation[];

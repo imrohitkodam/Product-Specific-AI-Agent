@@ -38,7 +38,7 @@ export class GeminiService {
     console.log("Using API Key:", process.env.API_KEY?.substring(0, 10) + "...");
     const genAI = new GoogleGenerativeAI(process.env.API_KEY || '');
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {

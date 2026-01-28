@@ -15,7 +15,7 @@ export class GeminiService {
       try {
         const promises = batch.map(text =>
           ai.models.embedContent({
-            model: 'embedding-001',
+            model: 'text-embedding-004',
             contents: { parts: [{ text }] }
           })
         );

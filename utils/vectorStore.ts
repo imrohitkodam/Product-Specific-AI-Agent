@@ -8,7 +8,9 @@ export interface EmbeddedChunk extends Chunk {
 // Calculate cosine similarity between two vectors
 export const cosineSimilarity = (vecA: number[], vecB: number[]): number => {
     if (vecA.length !== vecB.length) {
-        throw new Error("Vectors must have the same length");
+        // Gracefully handle dimension mismatch (likely due to model switch)
+        // console.warn(`Vector dimension mismatch: ${vecA.length} vs ${vecB.length}`);
+        return -1;
     }
 
     let dotProduct = 0;

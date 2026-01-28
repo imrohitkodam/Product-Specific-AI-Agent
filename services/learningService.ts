@@ -26,6 +26,7 @@ export class LearningService {
             let highestScore = -1;
 
             for (const item of knowledgeBase) {
+                // Safety check for dimension mismatch
                 if (!item.embedding || item.embedding.length !== queryEmbedding.length) continue;
                 const score = cosineSimilarity(queryEmbedding, item.embedding);
                 if (score > highestScore) {
